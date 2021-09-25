@@ -70,6 +70,8 @@ func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
 	resp, err := method.Call(request.Context(), request.Body)
 	if err != nil {
 		if rpcErr, ok := err.(*Error); ok {
