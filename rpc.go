@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -48,6 +49,18 @@ func (r *Rpc) RegisterMethod(method Method) error {
 	r.GetSwagger(context.Background()) // Check swagger
 
 	return nil
+}
+
+func (r *Rpc) GetPaths() []string {
+	res := make([]string, 0, len(r.methods))
+
+	for path := range r.methods {
+		res = append(res, path)
+	}
+
+	sort.Strings(res)
+
+	return res
 }
 
 func (r *Rpc) GetMethod(path string) *MethodDesc {
