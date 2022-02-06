@@ -4,11 +4,12 @@
 package openapi
 
 type OpenApi struct {
-	Openapi    string          `json:"openapi" yaml:"openapi"`
-	Info       Info            `json:"info" yaml:"info"`
-	Servers    []Server        `json:"servers,omitempty" yaml:"servers,omitempty"`
-	Paths      map[string]Path `json:"paths" yaml:"paths"`
-	Components Components      `json:"components" yaml:"components"`
+	Openapi    string                  `json:"openapi" yaml:"openapi"`
+	Info       Info                    `json:"info" yaml:"info"`
+	Servers    []Server                `json:"servers,omitempty" yaml:"servers,omitempty"`
+	Paths      map[string]Path         `json:"paths" yaml:"paths"`
+	Components Components              `json:"components" yaml:"components"`
+	Security   []map[string][]struct{} `json:"security,omitempty" yaml:"security,omitempty"`
 }
 
 type Info struct {
@@ -62,6 +63,13 @@ type Schema struct {
 	Pattern     string            `json:"pattern,omitempty" yaml:"pattern,omitempty"`
 }
 
+type SecurityScheme struct {
+	Type string `json:"type" yaml:"type"`
+	In   string `json:"in" yaml:"in"`
+	Name string `json:"name" yaml:"name"`
+}
+
 type Components struct {
-	Schemas map[string]Schema `json:"schemas" yaml:"schemas"`
+	Schemas         map[string]Schema         `json:"schemas" yaml:"schemas"`
+	SecuritySchemes map[string]SecurityScheme `json:"securitySchemes,omitempty" yaml:"securitySchemes,omitempty"`
 }
