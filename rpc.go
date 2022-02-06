@@ -13,12 +13,31 @@ import (
 type Rpc struct {
 	trimPrefix string
 	methods    map[string]*MethodDesc
+	options    *opts
 }
 
-func New(trimPrefix string) *Rpc {
+type opts struct {
+	cors string
+}
+
+type OptsFunc func(*opts)
+
+func WithCors(allowedOrigins string) OptsFunc {
+	return func(opts *opts) {
+		opts.cors = allowedOrigins
+	}
+}
+
+func New(trimPrefix string, options ...OptsFunc) *Rpc {
+	computedOpts := &opts{}
+	for _, f := range options {
+		f(computedOpts)
+	}
+
 	return &Rpc{
 		trimPrefix: trimPrefix,
 		methods:    map[string]*MethodDesc{},
+		options:    computedOpts,
 	}
 }
 
@@ -70,6 +89,18 @@ func (r *Rpc) GetMethod(path string) *MethodDesc {
 }
 
 func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
+	if r.options.cors != "" {
+		w.Header().Set("Access-Control-Allow-Origin", r.options.cors)
+	}
+
+	if request.Method == http.MethodOptions && r.options.cors != "" { // Cors
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "X-API-Key, Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if request.Method != http.MethodPost {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
