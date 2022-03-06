@@ -198,16 +198,16 @@ var (
 
 export default class API {
   static url = '/api'
+  static customHeaders: () => Promise<Record<string, string>> | undefined
 
-  private static post(method: string, request: unknown): unknown {
+  private static async post(method: string, request: unknown): Promise<unknown> {
     return fetch(
       this.url + method,
       {
         method: 'post',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': localStorage.getItem('token') || ''
-        },
+        headers: Object.assign(this.customHeaders ? await this.customHeaders() : {}, {
+          'Content-Type': 'application/json'
+        }),
         body: JSON.stringify(request)
       }
     )
