@@ -50,8 +50,6 @@ func New(rpc *rpc.Rpc, prefix string) http.HandlerFunc {
 
 		methodsCode.WriteString("\n}")
 
-		_, _ = io.WriteString(w, "/* eslint-disable camelcase */\n\n")
-
 		typesNames := make([]string, 0, len(types))
 		for t := range types {
 			typesNames = append(typesNames, t)
@@ -129,7 +127,7 @@ func toTsTypeName(varType reflect.Type, prefix string) string {
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return "number"
 	case reflect.Interface:
-		return "any"
+		return "unknown"
 	default:
 		panic(fmt.Sprintf("Unknown kind %s", varType.Kind().String()))
 	}
