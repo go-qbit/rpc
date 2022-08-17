@@ -130,7 +130,7 @@ func toTsTypeName(varType reflect.Type, prefix string) string {
 		return "number"
 	case reflect.Interface:
 		if varType == reflect.TypeOf((*rpc.File)(nil)).Elem() {
-			return "File"
+			return "Blob"
 		} else {
 			return "unknown"
 		}
@@ -208,7 +208,7 @@ export default class API {
     const form = new FormData()
     const json_data:any = {}
     for (let name in request){
-      if (request[name] instanceof File){
+      if (request[name] instanceof Blob){
         form.append(name, request[name])
         continue
       }
