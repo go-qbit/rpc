@@ -51,6 +51,15 @@ func (r *Rpc) GetSwagger(ctx context.Context) *openapi.OpenApi {
 			errorsDescription += "\n"
 		}
 
+		requestContentType := "application/json"
+		t := method.Request.Elem()
+		for i := 0; i < t.NumField(); i++ {
+			if t.Field(i).Type == reflect.TypeOf((*File)(nil)).Elem() {
+				requestContentType = "multipart/form-data"
+				break
+			}
+		}
+
 		res.Paths[path] = openapi.Path{
 			Post: openapi.Operation{
 				Summary:     method.Method.Caption(ctx),
@@ -61,7 +70,7 @@ func (r *Rpc) GetSwagger(ctx context.Context) *openapi.OpenApi {
 					Description: "",
 					Required:    true,
 					Content: map[string]openapi.Content{
-						"application/json": {
+						requestContentType: {
 							Schema: r.getSchema(method.Request, res.Components.Schemas),
 						},
 					},
@@ -142,10 +151,8 @@ func (r *Rpc) getSchema(t reflect.Type, storage map[string]openapi.Schema) opena
 		name := r.typeName(t)
 
 		if _, exists := storage[name]; !exists {
-			schema := openapi.Schema{
-				Type:       "object",
-				Properties: map[string]openapi.Schema{},
-			}
+			jsonDataFields := make(map[string]openapi.Schema)
+			fileFields := make(map[string]openapi.Schema)
 
 			for i := 0; i < t.NumField(); i++ {
 				f := t.Field(i)
@@ -157,14 +164,33 @@ func (r *Rpc) getSchema(t reflect.Type, storage map[string]openapi.Schema) opena
 				if name == "-" {
 					continue
 				}
-
 				fieldSchema := r.getSchema(f.Type, storage)
 				fieldSchema.Description = f.Tag.Get("desc")
 				if err := addFieldRestrictions(f, &fieldSchema); err != nil {
 					panic(fmt.Sprintf("Invalid validator value: %v", err))
 				}
 
-				schema.Properties[name] = fieldSchema
+				if f.Type == reflect.TypeOf((*File)(nil)).Elem() {
+					fileFields[name] = fieldSchema
+					continue
+				}
+				jsonDataFields[name] = fieldSchema
+
+			}
+
+			schema := openapi.Schema{
+				Type:       "object",
+				Properties: map[string]openapi.Schema{},
+			}
+
+			if len(fileFields) > 0 {
+				schema.Properties = fileFields
+				schema.Properties["json_data"] = openapi.Schema{
+					Type:       "object",
+					Properties: jsonDataFields,
+				}
+			} else {
+				schema.Properties = jsonDataFields
 			}
 
 			storage[name] = schema
@@ -173,6 +199,12 @@ func (r *Rpc) getSchema(t reflect.Type, storage map[string]openapi.Schema) opena
 		return openapi.Schema{Ref: "#/components/schemas/" + name}
 
 	case reflect.Interface, reflect.Map:
+		if t == reflect.TypeOf((*File)(nil)).Elem() {
+			return openapi.Schema{
+				Type:   "string",
+				Format: "binary",
+			}
+		}
 		return openapi.Schema{Type: "object"}
 
 	default:

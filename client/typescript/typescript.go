@@ -40,7 +40,9 @@ func New(rpc *rpc.Rpc, prefix string) http.HandlerFunc {
 			methodsCode.WriteString(toTsTypeName(m.Response, prefix))
 			methodsCode.WriteString("> {\n    return this.post('")
 			methodsCode.WriteString(path)
-			methodsCode.WriteString("', request) as Promise<")
+			methodsCode.WriteString("', request,'")
+			methodsCode.WriteString(checkContentType(m.Request))
+			methodsCode.WriteString("') as Promise<")
 			methodsCode.WriteString(toTsTypeName(m.Response, prefix))
 			methodsCode.WriteString(">\n  }")
 
@@ -127,7 +129,11 @@ func toTsTypeName(varType reflect.Type, prefix string) string {
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		return "number"
 	case reflect.Interface:
-		return "unknown"
+		if varType == reflect.TypeOf((*rpc.File)(nil)).Elem() {
+			return "File"
+		} else {
+			return "unknown"
+		}
 	default:
 		panic(fmt.Sprintf("Unknown kind %s", varType.Kind().String()))
 	}
@@ -198,15 +204,29 @@ export default class API {
   static url = '/api'
   static customHeaders: () => Promise<Record<string, string>> | undefined
 
-  private static async post(method: string, request: unknown): Promise<unknown> {
+  private static requestToFormData (request: any): FormData{
+    const form = new FormData()
+    const json_data:any = {}
+    for (let name in request){
+      if (request[name] instanceof File){
+        form.append(name, request[name])
+        continue
+      }
+        json_data[name] = request[name]
+    }
+    if (Object.keys(json_data).length!==0) form.append("json_data", JSON.stringify(json_data))
+    return form
+  }
+
+  private static async post(method: string, request: unknown, contentType: string): Promise<unknown> {
     return fetch(
       this.url + method,
       {
-        method: 'post',
-        headers: Object.assign(this.customHeaders ? await this.customHeaders() : {}, {
-          'Content-Type': 'application/json'
-        }),
-        body: JSON.stringify(request)
+		method: 'post',
+        headers: Object.assign(this.customHeaders? await this.customHeaders()!: {},
+        contentType === 'application/json'? {'Content-Type': contentType}: {}
+        ),
+        body: contentType === 'application/json'? JSON.stringify(request) : this.requestToFormData(request)  
       }
     )
       .then(response => {
@@ -230,3 +250,16 @@ export default class API {
       .then((response) => response.json())
   }`
 )
+
+func checkContentType(st reflect.Type) string {
+	st = st.Elem()
+	ret := "application/json"
+	for i := 0; i < st.NumField(); i++ {
+		if st.Field(i).Type == reflect.TypeOf((*rpc.File)(nil)).Elem() {
+			ret = "multipart/form-data"
+			break
+		}
+	}
+
+	return ret
+}
