@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 )
-
-var boundaryRe = regexp.MustCompile(`;.*boundary=(.*)`)
 
 type Rpc struct {
 	trimPrefix string
@@ -20,8 +17,7 @@ type Rpc struct {
 }
 
 type opts struct {
-	cors      string
-	maxMemory int64
+	cors string
 }
 
 type OptsFunc func(*opts)
@@ -29,12 +25,6 @@ type OptsFunc func(*opts)
 func WithCors(allowedOrigins string) OptsFunc {
 	return func(opts *opts) {
 		opts.cors = allowedOrigins
-	}
-}
-
-func WithMaxMemory(size int64) OptsFunc {
-	return func(opts *opts) {
-		opts.maxMemory = size
 	}
 }
 
@@ -126,13 +116,7 @@ func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	boundary := ""
-	subs := boundaryRe.FindStringSubmatch(request.Header.Get("Content-Type"))
-	if len(subs) > 0 {
-		boundary = subs[1]
-	}
-
-	resp, err := method.Call(request.Context(), request.Body, boundary, r.options.maxMemory)
+	resp, err := method.Call(request.Context(), request.Body)
 	if err != nil {
 		if rpcErr, ok := err.(*Error); ok {
 			w.WriteHeader(http.StatusBadRequest)

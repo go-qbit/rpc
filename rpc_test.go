@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"mime/multipart"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -51,7 +50,7 @@ func TestRpc_ServeHTTP_Valid(t *testing.T) {
 		StructPtrParam: &mHello.StructV1{
 			F1: 20,
 		},
-	}), "application/json")
+	}))
 
 	if status != 200 {
 		t.Fatalf("Invalid status code = %d, expected 200. Data: '%s'", status, data)
@@ -71,41 +70,9 @@ func TestRpc_ServeHTTP_Valid(t *testing.T) {
 	}
 }
 
-func TestRpc_ServeHttp_Multipart_Valid(t *testing.T) {
-	buf := &bytes.Buffer{}
-	w := multipart.NewWriter(buf)
-	w.WriteField("json_data", `{"int_param": 1}`)
-
-	fw, err := w.CreateFormFile("content", "hello")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = fw.Write([]byte("Hello world"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.Close()
-
-	status, data := doPost("/hello/v3", buf, w.FormDataContentType())
-	if status != 200 {
-		t.Fatalf("Invalid status code = %d, expected 200. Data: '%s'", status, data)
-	}
-	var resp mHello.RespV3
-	if err := json.Unmarshal(data, &resp); err != nil {
-		t.Fatal(err)
-	}
-
-	if resp.IntParam != 1 {
-		t.Fatalf("Invalid IntParam field = %d, expected 1", resp.IntParam)
-	}
-	if resp.ContentLength != 11 {
-		t.Fatalf("Invalid IntParam field = %d, expected 11", resp.ContentLength)
-	}
-}
-
 func TestRpc_ServeHTTP_InvalidJson(t *testing.T) {
 	buf := bytes.NewBufferString(`a: 10`)
-	status, data := doPost("/hello/v1", buf, "application/json")
+	status, data := doPost("/hello/v1", buf)
 	if status != 400 {
 		t.Fatalf("Invalid status code = %d, expected 400. Data: '%s'", status, data)
 	}
@@ -126,7 +93,7 @@ func TestRpc_ServeHTTP_Validator_MinimumInt(t *testing.T) {
 		StructParam: mHello.StructV1{
 			F1: 10,
 		},
-	}), "application/json")
+	}))
 	if status != 400 {
 		t.Fatalf("Invalid status code = %d, expected 400. Data: '%s'", status, data)
 	}
@@ -147,7 +114,7 @@ func TestRpc_ServeHTTP_Validator_MinimumUint(t *testing.T) {
 		StructParam: mHello.StructV1{
 			F1: 0,
 		},
-	}), "application/json")
+	}))
 	if status != 400 {
 		t.Fatalf("Invalid status code = %d, expected 400. Data: '%s'", status, data)
 	}
@@ -168,7 +135,7 @@ func TestRpc_ServeHTTP_Validator_MaximumInt(t *testing.T) {
 		StructParam: mHello.StructV1{
 			F1: 10,
 		},
-	}), "application/json")
+	}))
 	if status != 400 {
 		t.Fatalf("Invalid status code = %d, expected 400. Data: '%s'", status, data)
 	}
@@ -189,7 +156,7 @@ func TestRpc_ServeHTTP_Validator_MaximumUint(t *testing.T) {
 		StructParam: mHello.StructV1{
 			F1: 500,
 		},
-	}), "application/json")
+	}))
 	if status != 400 {
 		t.Fatalf("Invalid status code = %d, expected 400. Data: '%s'", status, data)
 	}
@@ -211,7 +178,7 @@ func TestRpc_ServeHTTP_Validator_Pattern(t *testing.T) {
 		StructParam: mHello.StructV1{
 			F1: 10,
 		},
-	}), "application/json")
+	}))
 	if status != 400 {
 		t.Fatalf("Invalid status code = %d, expected 400. Data: '%s'", status, data)
 	}
@@ -230,7 +197,7 @@ func BenchmarkMethodDesc_Call(b *testing.B) {
 	m := testRpc.GetMethod("/hello/v1")
 
 	for i := 0; i < b.N; i++ {
-		_, err := m.Call(context.Background(), bytes.NewBufferString(`{"int_param": 150, "str_param": "str value", "struct_param": {"f1": 10}}`), "", 0)
+		_, err := m.Call(context.Background(), bytes.NewBufferString(`{"int_param": 150, "str_param": "str value", "struct_param": {"f1": 10}}`))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -246,8 +213,8 @@ func toJson(data interface{}) io.Reader {
 	return buf
 }
 
-func doPost(method string, req io.Reader, contentType string) (int, []byte) {
-	resp, err := testHttpServer.Client().Post(testHttpServer.URL+method, contentType, req)
+func doPost(method string, req io.Reader) (int, []byte) {
+	resp, err := testHttpServer.Client().Post(testHttpServer.URL+method, "application/json", req)
 	if err != nil {
 		panic(err)
 	}

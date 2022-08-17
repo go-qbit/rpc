@@ -1,13 +1,10 @@
 package rpc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
-	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -26,20 +23,6 @@ type MethodDesc struct {
 	Func       reflect.Value
 	Errors     map[string]string
 	Validators map[string][]validateFunc
-}
-
-type File io.ReadCloser
-
-type buffer struct {
-	b *bytes.Buffer
-}
-
-func (b *buffer) Close() error {
-	return nil
-}
-
-func (b *buffer) Read(p []byte) (int, error) {
-	return b.b.Read(p)
 }
 
 var (
@@ -196,61 +179,11 @@ func bindErrors(m Method, trimPrefix string, methods map[string]*MethodDesc) err
 	return nil
 }
 
-func (m *MethodDesc) Call(ctx context.Context, r io.Reader, boundary string, maxMemory int64) (interface{}, error) {
+func (m *MethodDesc) Call(ctx context.Context, r io.Reader) (interface{}, error) {
 	req := reflect.New(m.Request.Elem())
 
-	if boundary != "" {
-		reader := multipart.NewReader(r, boundary)
-		for {
-			p, err := reader.NextPart()
-			// This is OK, no more parts
-			if err == io.EOF {
-				break
-			}
-
-			if err != nil {
-				return nil, err
-			}
-
-			var file File
-
-			if name, ok := checkFileField(p.FormName(), req.Elem().Type()); ok {
-				buf := &bytes.Buffer{}
-				n, err := io.CopyN(buf, p, maxMemory+1)
-				if err != nil && err != io.EOF {
-					return nil, err
-				}
-				file = &buffer{buf}
-				if n > maxMemory {
-					tmp, err := os.CreateTemp("", "rpc-multipart-")
-					if err != nil {
-						return nil, err
-					}
-					_, err = io.Copy(tmp, io.MultiReader(buf, p))
-					if err != nil {
-						os.Remove(tmp.Name())
-						return nil, err
-					}
-					_, err = tmp.Seek(0, 0)
-					if err != nil {
-						os.Remove(tmp.Name())
-						return nil, err
-					}
-					file = tmp
-
-				}
-				req.Elem().FieldByName(name).Set(reflect.ValueOf(file))
-				continue
-			}
-			if err := json.NewDecoder(p).Decode(req.Interface()); err != nil && err != io.EOF {
-				return nil, &Error{Code: "INVALID_JSON", Message: err.Error()}
-			}
-		}
-
-	} else {
-		if err := json.NewDecoder(r).Decode(req.Interface()); err != nil {
-			return nil, &Error{Code: "INVALID_JSON", Message: err.Error()}
-		}
+	if err := json.NewDecoder(r).Decode(req.Interface()); err != nil {
+		return nil, &Error{Code: "INVALID_JSON", Message: err.Error()}
 	}
 
 	if len(m.Validators) > 0 {
@@ -266,16 +199,6 @@ func (m *MethodDesc) Call(ctx context.Context, r io.Reader, boundary string, max
 	}
 
 	return res[0].Interface(), nil
-}
-
-func checkFileField(partName string, t reflect.Type) (string, bool) {
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		if partName == field.Tag.Get("json") && t.Field(i).Type.Implements(reflect.TypeOf((*File)(nil)).Elem()) {
-			return t.Field(i).Name, true
-		}
-	}
-	return "", false
 }
 
 func (m *MethodDesc) validateData(data reflect.Value, curPath string) error {
