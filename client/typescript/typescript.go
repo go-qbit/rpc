@@ -40,7 +40,7 @@ func New(rpc *rpc.Rpc, prefix string) http.HandlerFunc {
 			methodsCode.WriteString(toTsTypeName(m.Response, prefix))
 			methodsCode.WriteString("> {\n    return this.post('")
 			methodsCode.WriteString(path)
-			methodsCode.WriteString("', request,'")
+			methodsCode.WriteString("', request, '")
 			methodsCode.WriteString(checkContentType(m.Request))
 			methodsCode.WriteString("') as Promise<")
 			methodsCode.WriteString(toTsTypeName(m.Response, prefix))
@@ -61,34 +61,38 @@ func New(rpc *rpc.Rpc, prefix string) http.HandlerFunc {
 		for _, name := range typesNames {
 			_, _ = io.WriteString(w, "export type ")
 			_, _ = io.WriteString(w, name)
-			_, _ = io.WriteString(w, " = {")
 
-			for i := 0; i < types[name].NumField(); i++ {
-				field := types[name].Field(i)
-				name := field.Tag.Get("json")
-				name = strings.Split(name, ",")[0]
-				if name == "" {
-					name = field.Name
-				}
-				if name == "-" {
-					continue
-				}
+			if types[name].NumField() > 0 {
+				_, _ = io.WriteString(w, " = {")
 
-				_, _ = io.WriteString(w, "\n  ")
-				_, _ = io.WriteString(w, name)
-				if field.Type.Kind() == reflect.Ptr {
-					_, _ = io.WriteString(w, "?")
-				}
-				_, _ = io.WriteString(w, ": ")
-				_, _ = io.WriteString(w, toTsTypeName(field.Type, prefix))
+				for i := 0; i < types[name].NumField(); i++ {
+					field := types[name].Field(i)
+					name := field.Tag.Get("json")
+					name = strings.Split(name, ",")[0]
+					if name == "" {
+						name = field.Name
+					}
+					if name == "-" {
+						continue
+					}
 
-				if description := field.Tag.Get("desc"); description != "" {
-					_, _ = io.WriteString(w, "  // ")
-					_, _ = io.WriteString(w, description)
+					_, _ = io.WriteString(w, "\n  ")
+					_, _ = io.WriteString(w, name)
+					if field.Type.Kind() == reflect.Ptr {
+						_, _ = io.WriteString(w, "?")
+					}
+					_, _ = io.WriteString(w, ": ")
+					_, _ = io.WriteString(w, toTsTypeName(field.Type, prefix))
+
+					if description := field.Tag.Get("desc"); description != "" {
+						_, _ = io.WriteString(w, "  // ")
+						_, _ = io.WriteString(w, description)
+					}
 				}
+				_, _ = io.WriteString(w, "\n}\n\n")
+			} else {
+				_, _ = io.WriteString(w, " = Record<string, never>\n\n")
 			}
-
-			_, _ = io.WriteString(w, "\n}\n\n")
 		}
 
 		_, _ = io.WriteString(w, tsLibBody)
@@ -204,17 +208,17 @@ export default class API {
   static url = '/api'
   static customHeaders: () => Promise<Record<string, string>> | undefined
 
-  private static requestToFormData (request: any): FormData{
+  private static requestToFormData(request: any): FormData {
     const form = new FormData()
-    const json_data:any = {}
-    for (let name in request){
-      if (request[name] instanceof Blob){
+    const json_data: any = {}
+    for (const name in request) {
+      if (request[name] instanceof Blob) {
         form.append(name, request[name])
         continue
       }
-        json_data[name] = request[name]
+      json_data[name] = request[name]
     }
-    if (Object.keys(json_data).length!==0) form.append("json_data", JSON.stringify(json_data))
+    if (Object.keys(json_data).length !== 0) form.append('json_data', JSON.stringify(json_data))
     return form
   }
 
@@ -222,11 +226,11 @@ export default class API {
     return fetch(
       this.url + method,
       {
-		method: 'post',
-        headers: Object.assign(this.customHeaders? await this.customHeaders()!: {},
-        contentType === 'application/json'? {'Content-Type': contentType}: {}
+        method: 'post',
+        headers: Object.assign(this.customHeaders ? await this.customHeaders()! : {},
+          contentType === 'application/json' ? {'Content-Type': contentType} : {}
         ),
-        body: contentType === 'application/json'? JSON.stringify(request) : this.requestToFormData(request)  
+        body: contentType === 'application/json' ? JSON.stringify(request) : this.requestToFormData(request)
       }
     )
       .then(response => {
