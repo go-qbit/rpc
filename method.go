@@ -64,6 +64,10 @@ func getMethodPath(m Method, trimPrefix string) (string, error) {
 	return strings.TrimPrefix(path, trimPrefix), nil
 }
 
+func ParseMethodDesc(m Method, trimPrefix string) ([]*MethodDesc, error) {
+	return descsFromMethod(m, trimPrefix)
+}
+
 func descsFromMethod(m Method, trimPrefix string) ([]*MethodDesc, error) {
 	path, err := getMethodPath(m, trimPrefix)
 	if err != nil {
