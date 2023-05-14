@@ -1,9 +1,11 @@
 package rpc
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
@@ -147,7 +149,17 @@ func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	var writer io.Writer = w
+	if CanGzipFast(request.Header.Get("Accept-Encoding")) {
+		w.Header().Set("Content-Encoding", "gzip")
+
+		gzW := gzip.NewWriter(writer)
+		defer gzW.Close()
+
+		writer = gzW
+	}
+
+	if err := json.NewEncoder(writer).Encode(resp); err != nil {
 		log.Printf("Cannot marshal response: %v", err)
 	}
 }
