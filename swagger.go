@@ -157,6 +157,9 @@ func (r *Rpc) getSchema(t reflect.Type, storage map[string]openapi.Schema) opena
 			for i := 0; i < t.NumField(); i++ {
 				f := t.Field(i)
 				name := f.Name
+				if !f.IsExported() {
+					continue
+				}
 				jsonTag, ok := f.Tag.Lookup("json")
 				if ok {
 					name = strings.Split(jsonTag, ",")[0]
