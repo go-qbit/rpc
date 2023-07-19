@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/go-qbit/rpc/htb"
 )
 
 var boundaryRe = regexp.MustCompile(`;.*boundary=(.*)`)
@@ -154,6 +156,8 @@ func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
 		w.Header().Set("Content-Encoding", "gzip")
 
 		gzW := gzip.NewWriter(writer)
+		gzW.Header.Name = htb.RandomString() // See https://ieeexplore.ieee.org/document/9754554
+
 		defer gzW.Close()
 
 		writer = gzW
