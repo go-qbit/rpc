@@ -24,15 +24,50 @@ type Rpc struct {
 }
 
 type opts struct {
-	cors      string
+	cors      *cors
 	maxMemory int64
+}
+
+type cors struct {
+	allowOrigin  string
+	allowHeaders string
+	allowMethods string
+	maxAge       string
 }
 
 type OptsFunc func(*opts)
 
 func WithCors(allowedOrigins string) OptsFunc {
 	return func(opts *opts) {
-		opts.cors = allowedOrigins
+		WithCorsV2(
+			strings.Split(allowedOrigins, ", "),
+			[]string{"X-API-Key", "Content-Type"},
+			[]string{"POST", "OPTIONS"},
+			"86400",
+		)
+	}
+}
+
+func WithCorsV2(origin, headers, methods []string, maxAge string) OptsFunc {
+	return func(opts *opts) {
+		c := &cors{}
+		if origin != nil {
+			c.allowOrigin = strings.Join(origin, ", ")
+		}
+
+		if headers != nil {
+			c.allowHeaders = strings.Join(headers, ", ")
+		}
+
+		if methods != nil {
+			c.allowMethods = strings.Join(methods, ", ")
+		}
+
+		if maxAge != "" {
+			c.maxAge = maxAge
+		}
+
+		opts.cors = c
 	}
 }
 
@@ -103,14 +138,14 @@ func (r *Rpc) GetMethod(path string) *MethodDesc {
 }
 
 func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
-	if r.options.cors != "" {
-		w.Header().Set("Access-Control-Allow-Origin", r.options.cors)
+	if r.options.cors != nil {
+		w.Header().Set("Access-Control-Allow-Origin", r.options.cors.allowOrigin)
+		w.Header().Set("Access-Control-Allow-Headers", r.options.cors.allowHeaders)
+		w.Header().Set("Access-Control-Allow-Methods", r.options.cors.allowMethods)
+		w.Header().Set("Access-Control-Max-Age", r.options.cors.maxAge)
 	}
 
-	if request.Method == http.MethodOptions && r.options.cors != "" { // Cors
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "X-API-Key, Content-Type")
-		w.Header().Set("Access-Control-Max-Age", "86400")
+	if request.Method == http.MethodOptions && r.options.cors.allowOrigin != "" { // Cors
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
