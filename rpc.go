@@ -20,7 +20,7 @@ var boundaryRe = regexp.MustCompile(`;.*boundary=(.*)`)
 type Rpc struct {
 	trimPrefix string
 	methods    map[string]*MethodDesc
-	options    *opts
+	options    opts
 }
 
 type opts struct {
@@ -78,9 +78,9 @@ func WithMaxMemory(size int64) OptsFunc {
 }
 
 func New(trimPrefix string, options ...OptsFunc) *Rpc {
-	computedOpts := &opts{}
+	computedOpts := opts{}
 	for _, f := range options {
-		f(computedOpts)
+		f(&computedOpts)
 	}
 
 	return &Rpc{
