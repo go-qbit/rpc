@@ -1,13 +1,11 @@
 package rpc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
-	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -26,20 +24,6 @@ type MethodDesc struct {
 	Func       reflect.Value
 	Errors     map[string]string
 	Validators map[string][]validateFunc
-}
-
-type File io.ReadCloser
-
-type buffer struct {
-	b *bytes.Buffer
-}
-
-func (b *buffer) Close() error {
-	return nil
-}
-
-func (b *buffer) Read(p []byte) (int, error) {
-	return b.b.Read(p)
 }
 
 var (
@@ -219,29 +203,18 @@ func (m *MethodDesc) Call(ctx context.Context, r io.Reader, boundary string, max
 			var file File
 
 			if name, ok := checkFileField(p.FormName(), req.Elem().Type()); ok {
-				buf := &bytes.Buffer{}
+				buf := &buffer{}
 				n, err := io.CopyN(buf, p, maxMemory+1)
 				if err != nil && err != io.EOF {
 					return nil, err
 				}
-				file = &buffer{buf}
-				if n > maxMemory {
-					tmp, err := os.CreateTemp("", "rpc-multipart-")
-					if err != nil {
-						return nil, err
-					}
-					_, err = io.Copy(tmp, io.MultiReader(buf, p))
-					if err != nil {
-						os.Remove(tmp.Name())
-						return nil, err
-					}
-					_, err = tmp.Seek(0, 0)
-					if err != nil {
-						os.Remove(tmp.Name())
-						return nil, err
-					}
-					file = tmp
+				file = buf
 
+				if n > maxMemory {
+					file, err = newTmpFile(buf, p)
+					if err != nil {
+						return nil, err
+					}
 				}
 				req.Elem().FieldByName(name).Set(reflect.ValueOf(file))
 				continue
