@@ -106,6 +106,11 @@ func (r *Rpc) GetSwagger(ctx context.Context) *openapi.OpenApi {
 func (r *Rpc) getSchema(t reflect.Type, storage map[string]openapi.Schema) openapi.Schema {
 	switch t.Kind() {
 	case reflect.Ptr:
+		name := r.typeName(t)
+		if s, exists := storage[name]; exists {
+			return s
+		}
+
 		return r.getSchema(t.Elem(), storage)
 
 	case reflect.String:
@@ -167,6 +172,7 @@ func (r *Rpc) getSchema(t reflect.Type, storage map[string]openapi.Schema) opena
 				if name == "-" {
 					continue
 				}
+				
 				fieldSchema := r.getSchema(f.Type, storage)
 				fieldSchema.Description = f.Tag.Get("desc")
 				if err := addFieldRestrictions(f, &fieldSchema); err != nil {

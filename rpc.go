@@ -143,11 +143,11 @@ func (r *Rpc) ServeHTTP(w http.ResponseWriter, request *http.Request) {
 		w.Header().Set("Access-Control-Allow-Headers", r.options.cors.allowHeaders)
 		w.Header().Set("Access-Control-Allow-Methods", r.options.cors.allowMethods)
 		w.Header().Set("Access-Control-Max-Age", r.options.cors.maxAge)
-	}
 
-	if request.Method == http.MethodOptions && r.options.cors.allowOrigin != "" { // Cors
-		w.WriteHeader(http.StatusNoContent)
-		return
+		if request.Method == http.MethodOptions && r.options.cors.allowOrigin != "" { // Cors preflight
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 	}
 
 	if request.Method != http.MethodPost {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"mime/multipart"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
@@ -223,6 +224,41 @@ func TestRpc_ServeHTTP_Validator_Pattern(t *testing.T) {
 
 	if resp.Code != "INVALID_JSON" {
 		t.Fatalf("Invalid error code field = '%s', expected 'INVALID_JSON'", resp.Code)
+	}
+}
+
+func TestRpc_ServeHTTP_OptionsWithoutCors(t *testing.T) {
+	r := rpc.New("github.com/go-qbit/rpc/internal/test/method")
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/anything", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, expected %d", w.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestRpc_ServeHTTP_OptionsWithCors(t *testing.T) {
+	r := rpc.New(
+		"github.com/go-qbit/rpc/internal/test/method",
+		rpc.WithCorsV2(
+			[]string{"https://example.com"},
+			[]string{"Content-Type"},
+			[]string{"POST", "OPTIONS"},
+			"86400",
+		),
+	)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodOptions, "/hello/v1", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, expected %d", w.Code, http.StatusNoContent)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://example.com" {
+		t.Fatalf("Access-Control-Allow-Origin = %q, expected %q", got, "https://example.com")
 	}
 }
 
