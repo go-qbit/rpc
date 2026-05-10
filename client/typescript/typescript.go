@@ -30,7 +30,7 @@ func New(rpc *rpc.Rpc, prefix string) http.HandlerFunc {
 			methodName := strings.Join(methodNameParts, "")
 
 			methodsCode.WriteString("\n\n  // ")
-			methodsCode.WriteString(m.Method.Description(r.Context()))
+			methodsCode.WriteString(escapeLineComment(m.Method.Description(r.Context())))
 			methodsCode.WriteString("\n")
 			methodsCode.WriteString(`  public static `)
 			methodsCode.WriteString(methodName)
@@ -86,7 +86,7 @@ func New(rpc *rpc.Rpc, prefix string) http.HandlerFunc {
 
 					if description := field.Tag.Get("desc"); description != "" {
 						_, _ = io.WriteString(w, "  // ")
-						_, _ = io.WriteString(w, description)
+						_, _ = io.WriteString(w, escapeLineComment(description))
 					}
 				}
 				_, _ = io.WriteString(w, "\n}\n\n")
@@ -254,6 +254,17 @@ export default class API {
       .then((response) => response.json())
   }`
 )
+
+// escapeLineComment makes s safe to embed in a `// ...` single-line comment by
+// collapsing CR/LF runs into a single space, so a multi-line description
+// cannot terminate the comment and produce invalid TypeScript.
+func escapeLineComment(s string) string {
+	if !strings.ContainsAny(s, "\r\n") {
+		return s
+	}
+	r := strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ")
+	return r.Replace(s)
+}
 
 func checkContentType(st reflect.Type) string {
 	st = st.Elem()
