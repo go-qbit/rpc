@@ -242,7 +242,7 @@ export default class API {
             case 400:
               response.json().then(err => {
                 reject(new ApiError(err.code, err.message, err.data))
-              })
+              }).catch(() => reject(new Error(response.statusText || 'Bad Request')))
               break
             default:
               response.text().then(text => {
